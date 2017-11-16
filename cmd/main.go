@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +19,7 @@ type Args struct {
 	Port       int    `short:"p" long:"port" default:"3000"`
 	Namespace  string `short:"n" long:"namespace" required:"yes"`
 	Set        string `short:"s" long:"set" required:"yes"`
+	Format     string `short:"f" long:"format" default:"json"`
 	Positional struct {
 		Rest []string
 	} `positional-args:"yes" required:"1"`
@@ -82,6 +84,11 @@ func printValue(w io.Writer, val interface{}) {
 	}
 }
 
+func toGob(w io.Writer, val interface{}) error {
+	enc := gob.NewEncoder(w)
+	return enc.Encode(val)
+}
+
 func main() {
 	args, err := parseFlags()
 	mustSucceed(err)
@@ -95,6 +102,15 @@ func main() {
 	record, err := client.Get(nil, key)
 	mustSucceed(err)
 
-	printValue(os.Stdout, map[string]interface{}(record.Bins))
+	switch args.Format {
+	case "json":
+		printValue(os.Stdout, map[string]interface{}(record.Bins))
+	case "gob":
+		gob.Register([]interface{}{})
+		gob.Register(map[interface{}]interface{}{})
+		mustSucceed(toGob(os.Stdout, map[string]interface{}(record.Bins)))
+	default:
+		log.Fatalf("Wrong output format: %s", args.Format)
+	}
 	fmt.Println("")
 }
